@@ -1,0 +1,139 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+class DiscoveryPage extends StatefulWidget {
+  const DiscoveryPage({Key? key}) : super(key: key);
+
+  @override
+  State<DiscoveryPage> createState() => _DiscoveryPageState();
+}
+
+class _DiscoveryPageState extends State<DiscoveryPage> {
+//List to store user data.
+  List<dynamic> users = [];
+
+ // Variable to track the current page of data.
+  int page = 1;
+
+  // Variable indicating the number of items to fetch per page.
+  int limit = 10;
+
+  //Flag indicating whether data is currently being fetched
+  bool isLoading = false;
+
+  // Flag indicating whether there is more data to be fetched.
+  bool hasMore = true;
+
+  //Scroll controller for the ListView
+  ScrollController _scrollController = ScrollController();
+
+  @override
+  //Initializes the state, sets up the scroll controller, and calls getUsers() to fetch initial data.
+  void initState() {
+    super.initState();
+    getUsers();
+    _scrollController.addListener(_scrollListener);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Discovery Page',
+          style: TextStyle(fontSize: 25),
+        ),
+        backgroundColor: Colors.redAccent.shade100,
+      ),
+      body: ListView.builder(
+        itemCount: users.length + (hasMore ? 1 : 0),
+        controller: _scrollController,
+        itemBuilder: (context, index) {
+          if (index < users.length) {
+            return Card(
+              elevation: 22,
+              child: ListTile(
+                title: Text(
+                  users[index]['title'],
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                ),
+                subtitle: Text(
+                  users[index]['description'],
+                  style: TextStyle(fontSize: 20),
+                ),
+                leading: CircleAvatar(
+                  radius: 30,
+                  child: Image.network(users[index]['image_url']),
+                ),
+              ),
+            );
+          } else if (hasMore) {
+            return Padding(
+              padding: EdgeInsets.all(10.0),
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+//Makes an HTTP GET request to the provided API endpoint with the current page and limit parameters.
+
+  getUsers() async {
+    if (!isLoading && hasMore) {
+      setState(() {
+        isLoading = true;
+      });
+
+      final url = 'https://api-stg.together.buzz/mocks/discovery';
+      final response =
+          await http.get(Uri.parse('$url?page=$page&limit=$limit'));
+      final body = response.body;
+      final json = jsonDecode(body);
+
+      setState(() {
+        users.addAll(json['data']);
+
+        if (json['data'].isEmpty) {
+
+       // Updates hasMore and shows a SnackBar if no more data is available.
+
+          hasMore = false;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('All user data fetched'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+
+        page++;
+        isLoading = false;
+      });
+
+      print('Users fetched - Page: $page');
+    }
+  }
+
+//Listens to the scroll position and triggers the getUsers method when reaching the end of the list.
+
+  _scrollListener() {
+    if (_scrollController.position.pixels ==
+        _scrollController.position.maxScrollExtent) {
+      // Load more data when reaching the end of the list
+      getUsers();
+    }
+  }
+
+//Disposes of the _scrollController when the widget is disposed to prevent memory leaks.
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+}
